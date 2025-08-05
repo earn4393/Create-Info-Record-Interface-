@@ -1,0 +1,83 @@
+FUNCTION-POOL ZFG_MM_04.                    "MESSAGE-ID ..
+
+* INCLUDE LZFG_MM_04D...                     " Local class definition
+
+TYPES: BEGIN OF TY_LTAP,
+         LGNUM TYPE LTAP-LGNUM,
+         TANUM TYPE LTAP-TANUM,
+         TAPOS TYPE LTAP-TAPOS,
+         MATNR TYPE LTAP-MATNR,
+         CHARG TYPE LTAP-CHARG,
+         VLPLA TYPE LTAP-VLPLA,
+         NLPLA TYPE LTAP-NLPLA,
+         VLENR TYPE LTAP-VLENR,
+         NLENR TYPE LTAP-NLENR,
+         VLTYP TYPE LTAP-VLTYP,
+         NLTYP TYPE LTAP-NLTYP,
+         LGORT TYPE LTAP-LGORT,
+         VSOLM TYPE LTAP-VSOLM,
+         ALTME TYPE LTAP-ALTME,
+       END OF TY_LTAP.
+
+DATA: GT_FIELDCAT_EINA TYPE LVC_T_FCAT,
+      GW_FIELDCAT_EINA TYPE LVC_S_FCAT,
+      GT_FIELDCAT_EINE TYPE LVC_T_FCAT,
+      GW_FIELDCAT_EINE TYPE LVC_S_FCAT,
+**-------------------->>  start add by kanyapak 17.07.2025  <<--------------------**
+      GT_FIELDCAT_KONP TYPE LVC_T_FCAT,
+      GW_FIELDCAT_KONP TYPE LVC_S_FCAT,
+      GT_FIELDCAT_KONM TYPE LVC_T_FCAT,
+      GW_FIELDCAT_KONM TYPE LVC_S_FCAT.
+**-------------------->>  end   add by kanyapak 17.06.2025  <<--------------------**
+
+DATA: GT_FIELDCAT TYPE LVC_S_FCAT,
+      GW_FIELDCAT TYPE LVC_S_FCAT.
+
+DATA: GW_EINA_I TYPE EINA,
+      GW_EINA_O TYPE EINA,
+      GS_EINA_N TYPE EINA,
+      GT_EINA_N TYPE TABLE OF EINA.
+
+DATA: GW_EINE_I TYPE EINE,
+      GW_EINE_O TYPE EINE,
+      GS_EINE_N TYPE EINE,
+      GT_EINE_N TYPE TABLE OF EINE.
+
+DATA: LV_NUM(10) TYPE I.
+
+FIELD-SYMBOLS: <LFS_VALUE_EINA> TYPE EINA,
+               <LFS_VALUE_EINE> TYPE EINE.
+
+FIELD-SYMBOLS: <LFS_VALUE> TYPE ANY.
+
+DATA: IT_LTAP      TYPE TABLE OF TY_LTAP,
+      LW_LTAP      TYPE TY_LTAP,
+      MESSAGE_TEXT TYPE T100-TEXT.
+
+DATA: IT_LTAP_CONF  LIKE TABLE OF LTAP_CONF,
+      WA_LTAP_CONF  TYPE LTAP_CONF,
+      I_LGNUM       LIKE  LTAK-LGNUM,
+      I_TANUM       TYPE  LTAK-TANUM,
+      I_SQUIT       TYPE  RL03T-SQUIT,
+      I_QNAME       TYPE  LTAP-QNAME,
+      I_ENAME       TYPE  LTAP-ENAME,
+      I_COMMIT_WORK TYPE  RL03B-COMIT VALUE 'X',
+      LV_KQUIT      TYPE LTAK-KQUIT.
+
+FIELD-SYMBOLS : <LTAP> TYPE TY_LTAP.
+FIELD-SYMBOLS : <GFST_OUT> TYPE TABLE.
+
+FIELD-SYMBOLS : <L_OUTPUT>      TYPE TABLE,
+                <LFS_DATA_EINA> TYPE EINA,
+                <LFS_DATA_EINE> TYPE EINE,
+                <L_LINE>        TYPE ANY,
+                <L_FIELD>       TYPE ANY,
+                <GFS_MSEG>      TYPE TY_MSEG.
+
+**-------------------->>  start add by kanyapak 22.07.2025  <<--------------------**
+
+" Batchinputdata of single transaction
+DATA : BDCDATA LIKE BDCDATA    OCCURS 0 WITH HEADER LINE.
+*       messages of call transaction
+DATA:   MESSTAB LIKE BDCMSGCOLL OCCURS 0 WITH HEADER LINE.
+**-------------------->>  start add by kanyapak 22.07.2025  <<--------------------**

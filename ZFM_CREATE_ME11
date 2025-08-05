@@ -1,0 +1,52 @@
+FUNCTION ZFM_CREATE_ME11.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(I_LIFNR) TYPE  EINA-LIFNR OPTIONAL
+*"     VALUE(I_MATNR) TYPE  EINA-MATNR OPTIONAL
+*"     VALUE(I_EKORG) TYPE  EINE-EKORG DEFAULT '0001'
+*"     VALUE(I_WERKS) TYPE  EINE-WERKS DEFAULT '0001'
+*"     VALUE(I_ESOKZ) TYPE  EINE-ESOKZ DEFAULT 'S'
+*"     VALUE(I_VAILD_FROM) TYPE  RV13A-DATAB OPTIONAL
+*"     VALUE(I_VAILD_TO) TYPE  RV13A-DATBI DEFAULT 99991231
+*"     VALUE(I_SCALE) TYPE  CHAR1 OPTIONAL
+*"  EXPORTING
+*"     VALUE(E_STATUS) TYPE  SYMSGTY
+*"     VALUE(E_MESSAGE) TYPE  BAPI_MSG
+*"  TABLES
+*"      T_INPUT STRUCTURE  ZSVI_GENC OPTIONAL
+*"----------------------------------------------------------------------
+
+  PERFORM VALIDATE_DATA2 TABLES T_INPUT
+                         USING I_LIFNR
+                               I_MATNR
+                               I_EKORG
+                               I_WERKS
+                               I_ESOKZ
+                               I_VAILD_TO
+                               I_VAILD_FROM
+                      CHANGING E_STATUS E_MESSAGE.
+
+  CHECK E_STATUS = ''.
+
+  perform PREPAR_DATA tables T_INPUT
+                      USING I_LIFNR
+                            I_EKORG
+                            I_WERKS
+                      CHANGING E_STATUS E_MESSAGE.
+
+  PERFORM POST_DATA2 TABLES T_INPUT
+                     USING I_LIFNR
+                           I_MATNR
+                           I_EKORG
+                           I_WERKS
+                           I_ESOKZ
+                           I_VAILD_TO
+                           I_VAILD_FROM
+                           I_SCALE
+                  CHANGING E_STATUS E_MESSAGE.
+
+
+
+
+ENDFUNCTION.

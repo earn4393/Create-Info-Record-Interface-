@@ -1,0 +1,724 @@
+*----------------------------------------------------------------------*
+***INCLUDE LZFG_TT_01F01 .
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  VALIDATE_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_T_INPUT  text
+*      <--P_E_STATUS  text
+*      <--P_E_MESSAGE  text
+*----------------------------------------------------------------------*
+FORM VALIDATE_DATA  TABLES   UT_T_INPUT STRUCTURE ZSVI_GENC
+                    USING    UV_I_INFNR
+                             UV_I_VAILD_TO
+                             UV_I_VAILD_FROM
+                    CHANGING CV_E_STATUS
+                             CV_E_MESSAGE.
+
+  DATA: LW_INPUT TYPE ZSVI_GENC.
+
+  REFRESH: GT_FIELDCAT_EINA,
+           GT_FIELDCAT_EINE,
+**-------------------->>  start add by kanyapak 17.07.2025  <<--------------------**
+           GT_FIELDCAT_KONP.
+**-------------------->>  end   add by kanyapak 17.07.2025  <<--------------------**
+
+  PERFORM: GET_EINA_FIELDCAT TABLES GT_FIELDCAT_EINA,
+           GET_EINE_FIELDCAT TABLES GT_FIELDCAT_EINE,
+
+**-------------------->>  start add by kanyapak 17.07.2025  <<--------------------**
+           GET_KONP_FIELDCAT TABLES GT_FIELDCAT_KONP.
+**-------------------->>  end   add by kanyapak 17.07.2025  <<--------------------**
+
+  LOOP AT UT_T_INPUT INTO LW_INPUT.
+    CONDENSE LW_INPUT-ZVALUE2.
+    CASE LW_INPUT-ZCONSTANT.
+      WHEN 'EINA'.
+        PERFORM VALIDATE_FORMAT TABLES GT_FIELDCAT_EINA
+                                USING LW_INPUT
+                                CHANGING CV_E_STATUS
+                                         CV_E_MESSAGE.
+
+      WHEN 'EINE'.
+        PERFORM VALIDATE_FORMAT TABLES GT_FIELDCAT_EINE
+                                USING LW_INPUT
+                                CHANGING CV_E_STATUS
+                                         CV_E_MESSAGE.
+**-------------------->>  start add by kanyapak 17.07.2025  <<--------------------**
+      WHEN 'KONP'.
+        PERFORM VALIDATE_FORMAT TABLES GT_FIELDCAT_KONP
+                                USING LW_INPUT
+                                CHANGING CV_E_STATUS
+                                         CV_E_MESSAGE.
+**-------------------->>  end   add by kanyapak 17.07.2025  <<--------------------**
+    ENDCASE.
+    CLEAR: GW_FIELDCAT_EINA, LW_INPUT.
+  ENDLOOP.
+
+**-------------------->>  start add by kanyapak 22.07.2025  <<--------------------**
+  IF  UV_I_VAILD_TO IS NOT INITIAL AND UV_I_VAILD_FROM IS NOT INITIAL
+      AND UV_I_VAILD_FROM >= UV_I_VAILD_TO.
+    CV_E_STATUS = 'E'.
+    CV_E_MESSAGE = 'Valid to less than Valid from'.
+  ENDIF.
+**-------------------->>  end   add by kanyapak 22.07.2025  <<--------------------**
+
+ENDFORM.                    " VALIDATE_DATA
+*&---------------------------------------------------------------------*
+*&      Form  PREPARE_OO_FIELDCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_LT_TAB  text
+*      -->P_GW_OUTPUT  text
+*----------------------------------------------------------------------*
+FORM PREPARE_OO_FIELDCAT  TABLES   PT_TAB
+                          USING    PW_OUT.
+
+  DATA: LO_STRUCT   TYPE REF TO CL_ABAP_STRUCTDESCR.
+
+  LO_STRUCT ?= CL_ABAP_TYPEDESCR=>DESCRIBE_BY_DATA( PW_OUT ).
+  PT_TAB[]  = LO_STRUCT->GET_COMPONENTS( ).
+
+ENDFORM.                    " PREPARE_OO_FIELDCAT
+*&---------------------------------------------------------------------*
+*&      Form  GET_EINA_FIELDCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_LT_FIELDCAT_EINA  text
+*----------------------------------------------------------------------*
+FORM GET_EINA_FIELDCAT  TABLES   CT_FIELDCAT_EINA STRUCTURE LVC_S_FCAT.
+
+  DATA: LW_EINA     TYPE EINA.
+  DATA: LW_FIELDCAT TYPE LVC_S_FCAT.
+
+  DATA: LT_TAB       TYPE CL_ABAP_STRUCTDESCR=>COMPONENT_TABLE,
+        LT_TOTAL_TAB TYPE CL_ABAP_STRUCTDESCR=>COMPONENT_TABLE.
+
+  DATA: LO_NEW_TAB  TYPE REF TO CL_ABAP_TABLEDESCR,
+        LO_NEW_TYPE TYPE REF TO CL_ABAP_STRUCTDESCR,
+        LO_DATA     TYPE REF TO DATA.
+
+  DATA: LR_TABDESCR TYPE REF TO CL_ABAP_STRUCTDESCR,
+        LR_DATA     TYPE REF TO DATA,
+        LT_DFIES    TYPE DDFIELDS,
+        LW_DFIES    TYPE DFIES,
+*        lw_fieldcat TYPE slis_fieldcat_alv.
+*        LW_FIELDCAT TYPE LVC_S_FCAT,
+        LV_FLAG     TYPE CHAR1.
+
+  PERFORM PREPARE_OO_FIELDCAT TABLES LT_TAB
+                              USING  LW_EINA.
+
+  APPEND LINES OF LT_TAB TO LT_TOTAL_TAB.
+
+  LO_NEW_TYPE = CL_ABAP_STRUCTDESCR=>CREATE(
+                  P_COMPONENTS = LT_TOTAL_TAB
+                  P_STRICT     = CL_ABAP_STRUCTDESCR=>FALSE ).
+
+  LO_NEW_TAB = CL_ABAP_TABLEDESCR=>CREATE( P_LINE_TYPE  = LO_NEW_TYPE
+                                           P_TABLE_KIND = CL_ABAP_TABLEDESCR=>TABLEKIND_STD
+                                           P_UNIQUE     = ABAP_FALSE ).
+
+  CREATE DATA LO_DATA TYPE HANDLE LO_NEW_TAB.
+*  ASSIGN lo_data->* TO <gfst_out>.
+  ASSIGN LO_DATA->* TO <GFST_OUT>.
+  CREATE DATA LR_DATA LIKE LINE OF <GFST_OUT>.
+  ASSIGN LR_DATA->* TO <L_LINE>.
+
+  LR_TABDESCR ?= CL_ABAP_STRUCTDESCR=>DESCRIBE_BY_DATA_REF( LR_DATA ).
+  LT_DFIES = CL_SALV_DATA_DESCR=>READ_STRUCTDESCR( LR_TABDESCR ).
+
+  FIELD-SYMBOLS: <FS_DFIES> LIKE LINE OF LT_DFIES.
+  REFRESH CT_FIELDCAT_EINA.
+  LOOP AT LT_DFIES ASSIGNING <FS_DFIES>.
+    CLEAR: LW_FIELDCAT,LV_FLAG.
+    MOVE-CORRESPONDING <FS_DFIES> TO LW_FIELDCAT.
+    LW_FIELDCAT-TABNAME = '<GFST_OUT>'.
+    APPEND LW_FIELDCAT TO CT_FIELDCAT_EINA[].
+  ENDLOOP.
+
+ENDFORM.                    " GET_EINA_FIELDCAT
+*&---------------------------------------------------------------------*
+*&      Form  GET_EINE_FIELDCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_LT_FIELDCAT_EINE  text
+*----------------------------------------------------------------------*
+FORM GET_EINE_FIELDCAT  TABLES   CT_FIELDCAT_EINE STRUCTURE LVC_S_FCAT.
+
+  DATA:  LW_EINE TYPE EINE.
+  DATA:  LW_FIELDCAT TYPE LVC_S_FCAT.
+
+  DATA: LT_TAB       TYPE CL_ABAP_STRUCTDESCR=>COMPONENT_TABLE,
+        LT_TOTAL_TAB TYPE CL_ABAP_STRUCTDESCR=>COMPONENT_TABLE.
+
+  DATA: LO_NEW_TAB  TYPE REF TO CL_ABAP_TABLEDESCR,
+        LO_NEW_TYPE TYPE REF TO CL_ABAP_STRUCTDESCR,
+        LO_DATA     TYPE REF TO DATA.
+
+  DATA: LR_TABDESCR TYPE REF TO CL_ABAP_STRUCTDESCR,
+        LR_DATA     TYPE REF TO DATA,
+        LT_DFIES    TYPE DDFIELDS,
+        LW_DFIES    TYPE DFIES,
+*        lw_fieldcat TYPE slis_fieldcat_alv.
+*        LW_FIELDCAT TYPE LVC_S_FCAT,
+        LV_FLAG     TYPE CHAR1.
+
+  PERFORM PREPARE_OO_FIELDCAT TABLES LT_TAB
+                              USING LW_EINE.
+
+  APPEND LINES OF LT_TAB TO LT_TOTAL_TAB.
+
+
+  LO_NEW_TYPE = CL_ABAP_STRUCTDESCR=>CREATE(
+                  P_COMPONENTS = LT_TOTAL_TAB
+                  P_STRICT     = CL_ABAP_STRUCTDESCR=>FALSE ).
+
+  LO_NEW_TAB = CL_ABAP_TABLEDESCR=>CREATE( P_LINE_TYPE  = LO_NEW_TYPE
+                                           P_TABLE_KIND = CL_ABAP_TABLEDESCR=>TABLEKIND_STD
+                                           P_UNIQUE     = ABAP_FALSE ).
+
+  CREATE DATA LO_DATA TYPE HANDLE LO_NEW_TAB.
+*  ASSIGN lo_data->* TO <gfst_out>.
+  ASSIGN LO_DATA->* TO <GFST_OUT>.
+  CREATE DATA LR_DATA LIKE LINE OF <GFST_OUT>.
+  ASSIGN LR_DATA->* TO <L_LINE>.
+
+  LR_TABDESCR ?= CL_ABAP_STRUCTDESCR=>DESCRIBE_BY_DATA_REF( LR_DATA ).
+  LT_DFIES = CL_SALV_DATA_DESCR=>READ_STRUCTDESCR( LR_TABDESCR ).
+
+  FIELD-SYMBOLS: <FS_DFIES> LIKE LINE OF LT_DFIES.
+  REFRESH CT_FIELDCAT_EINE.
+  LOOP AT LT_DFIES ASSIGNING <FS_DFIES>.
+    CLEAR: LW_FIELDCAT,LV_FLAG.
+    MOVE-CORRESPONDING <FS_DFIES> TO LW_FIELDCAT.
+    LW_FIELDCAT-TABNAME = '<GFST_OUT>'.
+    APPEND LW_FIELDCAT TO CT_FIELDCAT_EINE.
+  ENDLOOP.
+
+ENDFORM.                    " GET_EINE_FIELDCAT
+*&---------------------------------------------------------------------*
+*&      Form  GET_EINE_FIELDCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_LT_FIELDCAT_EINE  text
+*----------------------------------------------------------------------*
+FORM GET_KONP_FIELDCAT  TABLES CT_FIELDCAT_KONP STRUCTURE LVC_S_FCAT.
+
+  DATA:  LW_KONP TYPE KONP.
+  DATA:  LW_FIELDCAT TYPE LVC_S_FCAT.
+
+  DATA: LT_TAB       TYPE CL_ABAP_STRUCTDESCR=>COMPONENT_TABLE,
+        LT_TOTAL_TAB TYPE CL_ABAP_STRUCTDESCR=>COMPONENT_TABLE.
+
+  DATA: LO_NEW_TAB  TYPE REF TO CL_ABAP_TABLEDESCR,
+        LO_NEW_TYPE TYPE REF TO CL_ABAP_STRUCTDESCR,
+        LO_DATA     TYPE REF TO DATA.
+
+  DATA: LR_TABDESCR TYPE REF TO CL_ABAP_STRUCTDESCR,
+        LR_DATA     TYPE REF TO DATA,
+        LT_DFIES    TYPE DDFIELDS,
+        LW_DFIES    TYPE DFIES,
+*        lw_fieldcat TYPE slis_fieldcat_alv.
+*        LW_FIELDCAT TYPE LVC_S_FCAT,
+        LV_FLAG     TYPE CHAR1.
+
+  PERFORM PREPARE_OO_FIELDCAT TABLES LT_TAB
+                              USING LW_KONP.
+
+  APPEND LINES OF LT_TAB TO LT_TOTAL_TAB.
+
+
+  LO_NEW_TYPE = CL_ABAP_STRUCTDESCR=>CREATE(
+                  P_COMPONENTS = LT_TOTAL_TAB
+                  P_STRICT     = CL_ABAP_STRUCTDESCR=>FALSE ).
+
+  LO_NEW_TAB = CL_ABAP_TABLEDESCR=>CREATE( P_LINE_TYPE  = LO_NEW_TYPE
+                                           P_TABLE_KIND = CL_ABAP_TABLEDESCR=>TABLEKIND_STD
+                                           P_UNIQUE     = ABAP_FALSE ).
+
+  CREATE DATA LO_DATA TYPE HANDLE LO_NEW_TAB.
+*  ASSIGN lo_data->* TO <gfst_out>.
+  ASSIGN LO_DATA->* TO <GFST_OUT>.
+  CREATE DATA LR_DATA LIKE LINE OF <GFST_OUT>.
+  ASSIGN LR_DATA->* TO <L_LINE>.
+
+  LR_TABDESCR ?= CL_ABAP_STRUCTDESCR=>DESCRIBE_BY_DATA_REF( LR_DATA ).
+  LT_DFIES = CL_SALV_DATA_DESCR=>READ_STRUCTDESCR( LR_TABDESCR ).
+
+  FIELD-SYMBOLS: <FS_DFIES> LIKE LINE OF LT_DFIES.
+  REFRESH CT_FIELDCAT_KONP.
+  LOOP AT LT_DFIES ASSIGNING <FS_DFIES>.
+    CLEAR: LW_FIELDCAT,LV_FLAG.
+    MOVE-CORRESPONDING <FS_DFIES> TO LW_FIELDCAT.
+    LW_FIELDCAT-TABNAME = '<GFST_OUT>'.
+    APPEND LW_FIELDCAT TO CT_FIELDCAT_KONP.
+  ENDLOOP.
+
+ENDFORM.                    " GET_KOMV_FIELDCAT
+*&---------------------------------------------------------------------*
+*&      Form  VALIDATE_FORMAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_GT_FIELDCAT_EINA  text
+*      -->P_LW_INPUT  text
+*      <--P_CV_E_STATUS  text
+*      <--P_CV_E_MESSAGE  text
+*----------------------------------------------------------------------*
+FORM VALIDATE_FORMAT  TABLES   UT_FIELDCAT STRUCTURE LVC_S_FCAT
+                                 "Insert correct name for <...>
+                      USING    UW_INPUT TYPE ZSVI_GENC
+                      CHANGING CV_E_STATUS
+                               CV_E_MESSAGE.
+
+  DATA: LV_NUM     TYPE I,
+        LV_STRING  TYPE STRING,
+        LV_STRING3 TYPE STRING,
+        LV_STRING4 TYPE STRING,
+        LV_MSG     TYPE STRING.
+
+  LV_STRING  = UW_INPUT-ZVALUE2.
+  CONDENSE: LV_STRING, LV_STRING3, LV_STRING4.
+
+  READ TABLE UT_FIELDCAT INTO GW_FIELDCAT WITH KEY FIELDNAME = UW_INPUT-ZVALUE1.
+
+  IF SY-SUBRC NE 0.
+    CONCATENATE UW_INPUT-ZVALUE1 'does not exist in the system' INTO LV_MSG SEPARATED BY SPACE.
+    CV_E_STATUS = 'E'.
+    CV_E_MESSAGE = LV_MSG.
+  ELSE.
+    IF GW_FIELDCAT-INTTYPE = 'P' OR GW_FIELDCAT-INTTYPE EQ 'N' OR GW_FIELDCAT-INTTYPE EQ 'I'.
+      IF LV_STRING CO '1234567890.,'.
+        REPLACE ALL OCCURRENCES OF ',' IN LV_STRING WITH ''.
+      ELSE.
+        CV_E_STATUS = 'E'.
+        CV_E_MESSAGE = 'Provide The format of the NUMBER only.'.
+      ENDIF.
+    ELSEIF GW_FIELDCAT-INTTYPE EQ 'D'.
+
+      LV_NUM = STRLEN( LV_STRING ).
+      IF LV_NUM <> 10.
+        CV_E_STATUS = 'E'.
+        CV_E_MESSAGE = 'The format of the DATE is wrong.'.
+      ELSE.
+        IF NOT ( ( LV_STRING CP '++/++/++++' OR LV_STRING CP '++.++.++++'  ) AND
+                   LV_STRING CO '1234567890:' ).
+          CV_E_STATUS = 'E'.
+          CV_E_MESSAGE = 'The format of the DATE is wrong.'.
+        ENDIF.
+      ENDIF.
+    ELSEIF GW_FIELDCAT-INTTYPE EQ 'T'.
+      LV_NUM = STRLEN( LV_STRING ).
+      IF LV_NUM <> 8 AND LV_NUM <> 5.
+        CV_E_STATUS = 'E'.
+        CV_E_MESSAGE = 'The format of the time is wrong.'.
+      ELSE.
+        IF NOT ( ( LV_STRING CP '++:++:++' OR LV_STRING CP '++:++') AND
+                   LV_STRING CO '1234567890/.' ).
+          CV_E_STATUS = 'E'.
+          CV_E_MESSAGE = 'The format of the TIME is wrong.'.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.                    " VALIDATE_FORMAT
+*&---------------------------------------------------------------------*
+*&      Form  PREPARE_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_T_INPUT  text
+*      -->P_I_INFNR  text
+*      <--P_E_STATUS  text
+*      <--P_E_MESSAGE  text
+*----------------------------------------------------------------------*
+FORM PREP_DATA  TABLES   UT_INPUT STRUCTURE ZSVI_GENC
+                USING    UV_INFNR
+                         UV_WERKS
+                CHANGING
+                         CV_E_STATUS
+                         CV_E_MESSAGE .
+
+  DATA: LW_INPUT TYPE ZSVI_GENC,
+        LV_SRING TYPE STRING.
+
+  IF UT_INPUT[] IS NOT INITIAL.
+    SELECT SINGLE * FROM EINA INTO GW_EINA_O WHERE INFNR = UV_INFNR.
+    GW_EINA_I = GW_EINA_O.
+    IF SY-SUBRC = 0.
+      SELECT SINGLE * FROM EINE INTO GW_EINE_O WHERE INFNR = UV_INFNR
+                                               AND   WERKS = UV_WERKS.
+
+      GW_EINE_I = GW_EINE_O.
+
+      LOOP AT UT_INPUT INTO LW_INPUT.
+        CASE LW_INPUT-ZCONSTANT.
+          WHEN 'EINA'.
+            ASSIGN COMPONENT LW_INPUT-ZVALUE1 OF STRUCTURE GW_EINA_I TO <LFS_VALUE>.
+            IF SY-SUBRC = 0 AND <LFS_VALUE> IS ASSIGNED.
+              LV_SRING  = LW_INPUT-ZVALUE2.
+              CONDENSE LV_SRING.
+              <LFS_VALUE> = LV_SRING.
+            ENDIF.
+          WHEN 'EINE'.
+            ASSIGN COMPONENT LW_INPUT-ZVALUE1 OF STRUCTURE GW_EINE_I TO <LFS_VALUE>.
+            IF SY-SUBRC = 0 AND <LFS_VALUE> IS ASSIGNED.
+              LV_SRING  = LW_INPUT-ZVALUE2.
+              CONDENSE LV_SRING.
+              <LFS_VALUE> = LV_SRING.
+            ENDIF.
+        ENDCASE.
+      ENDLOOP.
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.                    " PREPARE_DATA
+*&---------------------------------------------------------------------*
+*&      Form  POST_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_T_INPUT  text
+*      -->P_I_INFNR  text
+*----------------------------------------------------------------------*
+FORM POST_DATA  TABLES   UT_INPUT STRUCTURE ZSVI_GENC
+                USING    UV_INFNR
+                         UV_VAILD_TO
+                         UV_VAILD_FROM
+                         UV_SCALE
+                CHANGING CV_E_STATUS
+                         CV_E_MESSAGE.
+
+  DATA: TXT_DATE(10),
+        COUNT        TYPE N VALUE 1,
+        COUNT_SCALE  TYPE N VALUE 1,
+        LV_SRING     TYPE STRING,
+        LV_FIELD     TYPE STRING,
+        LW_INPUT     TYPE ZSVI_GENC,
+        LV_LIFNR     TYPE EINA-LIFNR,
+        LV_MATNR     TYPE EINA-MATNR.
+
+    CALL FUNCTION 'CONVERSION_EXIT_ALPHA_OUTPUT'
+    EXPORTING
+      INPUT  =  GW_EINA_I-LIFNR
+    IMPORTING
+      OUTPUT = LV_LIFNR.
+
+  CALL FUNCTION 'CONVERSION_EXIT_MATN1_OUTPUT'
+    EXPORTING
+      INPUT  =  GW_EINA_I-MATNR
+    IMPORTING
+      OUTPUT = LV_MATNR.
+
+* changing general data and purch org data 1
+  CALL FUNCTION 'ME_INITIALIZE_INFORECORD'.
+  CALL FUNCTION 'ME_DIRECT_INPUT_INFORECORD'
+    EXPORTING
+      ACTIVITY         = 'V'
+      I_EINA           = GW_EINA_I
+      I_EINE           = GW_EINE_I
+      O_EINA           = GW_EINA_O
+      O_EINE           = GW_EINE_O
+      I_NO_SUPPOSE     = 'X'              " Keine Vorschlagsdaten setzen
+      I_VORGA          = 'A'              " Wer ruft den Funktionsbaustein auf?
+    IMPORTING
+      E_EINA           = GS_EINA_N
+      E_EINE           = GS_EINE_N
+    EXCEPTIONS
+      TEXTNAME_INVALID = 1
+      OTHERS           = 2.
+  IF SY-SUBRC <> 0.
+    MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+      WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ELSE.
+    APPEND: GS_EINA_N TO GT_EINA_N.
+    APPEND: GS_EINE_N TO GT_EINE_N.
+    CALL FUNCTION 'ME_POST_INFORECORD'
+      EXPORTING
+        I_NO_BUFFER_REFRESH = 'X'
+      TABLES
+        T_EINA_I            = GT_EINA_N " Einkaufsinfosatz - allgemeine Daten: Neue Sätze
+      EXCEPTIONS
+        OTHERS              = 2.
+    IF SY-SUBRC = 0.
+      CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+        EXPORTING
+          WAIT = 'X'.
+      CV_E_STATUS = 'S'.
+      CV_E_MESSAGE = ''.
+    ELSE.
+      CV_E_STATUS = 'E'.
+      CV_E_MESSAGE = 'Can not update Info record'.
+    ENDIF.
+  ENDIF.
+
+* changing price
+**-------------------->>  start add by kanyapak 22.07.2025  <<--------------------**
+  IF  UV_VAILD_TO IS NOT INITIAL AND UV_VAILD_FROM IS NOT INITIAL.
+
+    PERFORM BDC_DYNPRO      USING 'SAPMM06I' '0100'.
+    PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                                  '/00'.
+    PERFORM BDC_FIELD       USING 'EINA-LIFNR'
+                                   LV_LIFNR.
+    PERFORM BDC_FIELD       USING 'EINA-MATNR'
+                                  LV_MATNR.
+    PERFORM BDC_FIELD       USING 'EINE-EKORG'
+                                  GW_EINE_I-EKORG.
+    PERFORM BDC_FIELD       USING 'EINE-WERKS'
+                                  GW_EINE_I-WERKS.
+    CASE GW_EINE_I-ESOKZ.
+      WHEN '0'.   " Standard
+        PERFORM BDC_FIELD       USING 'RM06I-NORMB'
+                                      'X'.
+      WHEN '2'.     " Consignment
+        PERFORM BDC_FIELD       USING 'RM06I-KONSI'
+                                      'X'.
+      WHEN '3'.     " Subcontract
+        PERFORM BDC_FIELD       USING 'RM06I-LOHNB'
+                                      'X'.
+      WHEN 'P'.     " Pipeline
+        PERFORM BDC_FIELD       USING 'RM06I-PIPEL'
+                                      'X'.
+    ENDCASE.
+
+    PERFORM BDC_DYNPRO      USING 'SAPMM06I' '0101'.
+    PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                              '=KO'.
+
+    PERFORM BDC_DYNPRO      USING 'SAPLV14A' '0102'.
+    PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                                  '=NEWD'.
+
+
+    PERFORM BDC_DYNPRO      USING 'SAPMV13A' '0201'.
+    PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                                  '/00'.
+
+    CONCATENATE UV_VAILD_FROM+6(2)'.'UV_VAILD_FROM+4(2)'.'UV_VAILD_FROM(4) INTO TXT_DATE.
+    PERFORM BDC_FIELD       USING 'RV13A-DATAB'
+                                  TXT_DATE.
+
+    CONCATENATE UV_VAILD_TO+6(2)'.'UV_VAILD_TO+4(2)'.'UV_VAILD_TO(4) INTO TXT_DATE.
+    PERFORM BDC_FIELD       USING 'RV13A-DATBI'
+                                  TXT_DATE.
+
+    SORT UT_INPUT.
+    LOOP AT UT_INPUT INTO LW_INPUT WHERE ZCONSTANT = 'KONP'.
+
+      LV_SRING  = LW_INPUT-ZVALUE2.
+      CONDENSE LV_SRING NO-GAPS.
+
+      CONCATENATE LW_INPUT-ZCONSTANT'-'LW_INPUT-ZVALUE1'('COUNT')' INTO LV_FIELD.
+      CONDENSE LV_FIELD NO-GAPS.
+      PERFORM BDC_FIELD  USING LV_FIELD
+                               LV_SRING.
+
+      AT END OF ZGROUP.
+        COUNT = COUNT + 1.
+      ENDAT.
+
+    ENDLOOP.
+
+*  input scale
+    IF UV_SCALE = 'Y'.
+
+      PERFORM BDC_DYNPRO      USING 'SAPMV13A' '0201'.
+      PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                                    '=PSTF'.
+      PERFORM BDC_FIELD       USING 'RV130-SELKZ(01)'
+                                    'X'.
+
+      PERFORM BDC_DYNPRO      USING 'SAPMV13A' '0303'.
+      PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                                    '=BACK'.
+
+      LOOP AT UT_INPUT INTO LW_INPUT WHERE ZCONSTANT = 'KONM'.
+
+        LV_SRING  = LW_INPUT-ZVALUE2.
+        CONDENSE LV_SRING NO-GAPS.
+
+        CONCATENATE LW_INPUT-ZCONSTANT'-'LW_INPUT-ZVALUE1'('COUNT_SCALE')' INTO LV_FIELD.
+        CONDENSE LV_FIELD NO-GAPS.
+        PERFORM BDC_FIELD  USING LV_FIELD
+                                 LV_SRING.
+
+        AT END OF ZGROUP.
+          COUNT_SCALE = COUNT_SCALE + 1.
+        ENDAT.
+
+      ENDLOOP.
+
+    ENDIF.
+
+    PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                                  '=SICH'.
+    PERFORM BDC_TRANSACTION USING 'ME12'
+                            CHANGING CV_E_STATUS
+                                     CV_E_MESSAGE.
+
+    COMMIT WORK AND WAIT.
+
+  ENDIF.
+**-------------------->>  end   add by kanyapak 22.07.2025  <<--------------------**
+ENDFORM.                    " POST_DATA
+*&---------------------------------------------------------------------*
+*&      Form  BDC_DYNPRO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_1379   text
+*      -->P_1380   text
+*----------------------------------------------------------------------*
+FORM BDC_DYNPRO USING PROGRAM DYNPRO.
+  CLEAR BDCDATA.
+  BDCDATA-PROGRAM  = PROGRAM.
+  BDCDATA-DYNPRO   = DYNPRO.
+  BDCDATA-DYNBEGIN = 'X'.
+  APPEND BDCDATA.
+
+ENDFORM.                    " BDC_DYNPRO
+*&---------------------------------------------------------------------*
+*&      Form  BDC_FIELD
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_1605   text
+*      -->P_WA_IMP_INFOREC_INCO1  text
+*----------------------------------------------------------------------*
+FORM BDC_FIELD USING FNAM FVAL.
+  CLEAR BDCDATA.
+  BDCDATA-FNAM = FNAM.
+  BDCDATA-FVAL = FVAL.
+  APPEND BDCDATA.
+ENDFORM.                    " BDC_FIELD
+*----------------------------------------------------------------------*
+*        Start new transaction according to parameters                 *
+*----------------------------------------------------------------------*
+FORM BDC_TRANSACTION USING TCODE
+                     CHANGING CV_E_STATUS
+                              CV_E_MESSAGE.
+  DATA: L_MSTRING(480).
+  DATA : P_MODE TYPE CTU_PARAMS-DISMODE VALUE 'N'.
+
+* CALL TRANSACTION USING
+  REFRESH MESSTAB.
+
+  CALL TRANSACTION TCODE WITH AUTHORITY-CHECK USING BDCDATA
+                   MODE  P_MODE
+                   MESSAGES INTO MESSTAB.
+
+  READ TABLE MESSTAB WITH KEY MSGTYP = 'E'.
+  IF SY-SUBRC = 0.
+
+    CALL FUNCTION 'FORMAT_MESSAGE'
+      EXPORTING
+        ID        = MESSTAB-MSGID
+        LANG      = MESSTAB-MSGSPRA
+        NO        = MESSTAB-MSGNR
+        V1        = MESSTAB-MSGV1
+        V2        = MESSTAB-MSGV2
+        V3        = MESSTAB-MSGV3
+        V4        = MESSTAB-MSGV4
+      IMPORTING
+        MSG       = L_MSTRING
+      EXCEPTIONS
+        NOT_FOUND = 01
+        OTHERS    = 02.
+    IF SY-SUBRC = 0.
+      CV_E_MESSAGE  = L_MSTRING.
+      CV_E_STATUS = 'E'.
+    ENDIF.
+  ELSE.
+
+    CV_E_STATUS = 'S'.
+
+  ENDIF.
+  REFRESH BDCDATA.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_KONM_FIELDCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_GT_FIELDCAT_KONM  text
+*----------------------------------------------------------------------*
+FORM GET_KONM_FIELDCAT   TABLES   CT_FIELDCAT_KONM STRUCTURE LVC_S_FCAT.
+
+  DATA:  LW_KONM TYPE KONM.
+  DATA:  LW_FIELDCAT TYPE LVC_S_FCAT.
+
+  DATA: LT_TAB       TYPE CL_ABAP_STRUCTDESCR=>COMPONENT_TABLE,
+        LT_TOTAL_TAB TYPE CL_ABAP_STRUCTDESCR=>COMPONENT_TABLE.
+
+  DATA: LO_NEW_TAB  TYPE REF TO CL_ABAP_TABLEDESCR,
+        LO_NEW_TYPE TYPE REF TO CL_ABAP_STRUCTDESCR,
+        LO_DATA     TYPE REF TO DATA.
+
+  DATA: LR_TABDESCR TYPE REF TO CL_ABAP_STRUCTDESCR,
+        LR_DATA     TYPE REF TO DATA,
+        LT_DFIES    TYPE DDFIELDS,
+        LW_DFIES    TYPE DFIES,
+*        lw_fieldcat TYPE slis_fieldcat_alv.
+*        LW_FIELDCAT TYPE LVC_S_FCAT,
+        LV_FLAG     TYPE CHAR1.
+
+  PERFORM PREPARE_OO_FIELDCAT TABLES LT_TAB
+                              USING LW_KONM.
+
+  APPEND LINES OF LT_TAB TO LT_TOTAL_TAB.
+
+
+  LO_NEW_TYPE = CL_ABAP_STRUCTDESCR=>CREATE(
+                  P_COMPONENTS = LT_TOTAL_TAB
+                  P_STRICT     = CL_ABAP_STRUCTDESCR=>FALSE ).
+
+  LO_NEW_TAB = CL_ABAP_TABLEDESCR=>CREATE( P_LINE_TYPE  = LO_NEW_TYPE
+                                           P_TABLE_KIND = CL_ABAP_TABLEDESCR=>TABLEKIND_STD
+                                           P_UNIQUE     = ABAP_FALSE ).
+
+  CREATE DATA LO_DATA TYPE HANDLE LO_NEW_TAB.
+*  ASSIGN lo_data->* TO <gfst_out>.
+  ASSIGN LO_DATA->* TO <GFST_OUT>.
+  CREATE DATA LR_DATA LIKE LINE OF <GFST_OUT>.
+  ASSIGN LR_DATA->* TO <L_LINE>.
+
+  LR_TABDESCR ?= CL_ABAP_STRUCTDESCR=>DESCRIBE_BY_DATA_REF( LR_DATA ).
+  LT_DFIES = CL_SALV_DATA_DESCR=>READ_STRUCTDESCR( LR_TABDESCR ).
+
+  FIELD-SYMBOLS: <FS_DFIES> LIKE LINE OF LT_DFIES.
+  REFRESH CT_FIELDCAT_KONM.
+  LOOP AT LT_DFIES ASSIGNING <FS_DFIES>.
+    CLEAR: LW_FIELDCAT,LV_FLAG.
+    MOVE-CORRESPONDING <FS_DFIES> TO LW_FIELDCAT.
+    LW_FIELDCAT-TABNAME = '<GFST_OUT>'.
+    APPEND LW_FIELDCAT TO CT_FIELDCAT_KONM.
+  ENDLOOP.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  PREPAR_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_T_INPUT  text
+*      <--P_E_STATUS  text
+*      <--P_E_MESSAGE  text
+*----------------------------------------------------------------------*
+FORM PREPAR_DATA  TABLES   UT_INPUT STRUCTURE ZSVI_GENC
+                  USING UV_LIFNR
+                        UV_EKORG
+                        UV_WERKS
+                  CHANGING CV_E_STATUS
+                           CV_E_MESSAGE.
+
+ENDFORM.
