@@ -1,0 +1,294 @@
+*----------------------------------------------------------------------*
+***INCLUDE LZFG_MM_04F02.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  VALIDATE_DATA2
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_T_INPUT  text
+*      -->P_I_LIFNR  text
+*      -->P_I_MATNR  text
+*      -->P_I_EKORG  text
+*      -->P_I_WERKS  text
+*      -->P_I_VAILD_TO  text
+*      -->P_I_VAILD_FROM  text
+*      <--P_E_STATUS  text
+*      <--P_E_MESSAGE  text
+*----------------------------------------------------------------------*
+FORM VALIDATE_DATA2  TABLES   UT_T_INPUT STRUCTURE ZSVI_GENC
+                     USING    UV_I_LIFNR
+                              UV_I_MATNR
+                              UV_I_EKORG
+                              UV_I_WERKS
+                              UV_I_ESOKZ
+                              UV_I_VAILD_TO
+                              UV_I_VAILD_FROM
+                     CHANGING CV_E_STATUS
+                              CV_E_MESSAGE.
+
+  DATA: LW_INPUT TYPE ZSVI_GENC,
+        LV_LIFNR TYPE EINA-LIFNR.
+
+  REFRESH: GT_FIELDCAT_EINA,
+           GT_FIELDCAT_EINE,
+           GT_FIELDCAT_KONP.
+
+  PERFORM: GET_EINA_FIELDCAT TABLES GT_FIELDCAT_EINA,
+           GET_EINE_FIELDCAT TABLES GT_FIELDCAT_EINE,
+           GET_KONP_FIELDCAT TABLES GT_FIELDCAT_KONP,
+           GET_KONM_FIELDCAT TABLES GT_FIELDCAT_KONM.
+
+
+  IF UV_I_LIFNR IS INITIAL
+    OR UV_I_MATNR IS INITIAL
+    OR UV_I_EKORG IS INITIAL
+    OR UV_I_WERKS IS INITIAL
+    OR UV_I_ESOKZ IS INITIAL
+    OR UV_I_VAILD_TO IS INITIAL
+    OR UV_I_VAILD_FROM IS INITIAL
+    OR UT_T_INPUT[] IS INITIAL.
+
+    CV_E_STATUS = 'E'.
+    CV_E_MESSAGE = 'Input not completly'.
+  ENDIF.
+
+  CHECK CV_E_STATUS = ' '.
+
+  IF UV_I_VAILD_TO <= UV_I_VAILD_FROM.
+
+    CV_E_STATUS = 'E'.
+    CV_E_MESSAGE = 'Vaild to less than Vaild from'.
+
+  ENDIF.
+
+  CHECK CV_E_STATUS = ' '.
+
+  SELECT SINGLE EINA~LIFNR INTO LV_LIFNR
+    FROM EINA
+    INNER JOIN EINE
+    ON EINA~INFNR = EINE~INFNR
+    WHERE EINA~LIFNR = UV_I_LIFNR
+      AND EINA~MATNR = UV_I_MATNR
+      AND EINE~EKORG = UV_I_EKORG
+      AND EINE~WERKS = UV_I_WERKS
+    AND EINE~ESOKZ = UV_I_ESOKZ.
+  IF SY-SUBRC = 0.
+
+    CV_E_STATUS = 'E'.
+    CV_E_MESSAGE = 'It had info'.
+
+  ENDIF.
+
+  CHECK CV_E_STATUS = ' '.
+
+  LOOP AT UT_T_INPUT INTO LW_INPUT.
+    CONDENSE LW_INPUT-ZVALUE2.
+    CASE LW_INPUT-ZCONSTANT.
+      WHEN 'EINA'.
+        PERFORM VALIDATE_FORMAT TABLES GT_FIELDCAT_EINA
+                                USING LW_INPUT
+                                CHANGING CV_E_STATUS
+                                         CV_E_MESSAGE.
+
+      WHEN 'EINE'.
+        PERFORM VALIDATE_FORMAT TABLES GT_FIELDCAT_EINE
+                                USING LW_INPUT
+                                CHANGING CV_E_STATUS
+                                         CV_E_MESSAGE.
+
+      WHEN 'KONP'.
+        PERFORM VALIDATE_FORMAT TABLES GT_FIELDCAT_KONP
+                                USING LW_INPUT
+                                CHANGING CV_E_STATUS
+                                         CV_E_MESSAGE.
+      WHEN 'KONM'.
+        PERFORM VALIDATE_FORMAT TABLES GT_FIELDCAT_KONM
+                                USING LW_INPUT
+                                CHANGING CV_E_STATUS
+                                         CV_E_MESSAGE.
+
+    ENDCASE.
+    CLEAR: GW_FIELDCAT_EINA, LW_INPUT.
+  ENDLOOP.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  POST_DATA2
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_T_INPUT  text
+*      -->P_I_LIFNR  text
+*      -->P_I_MATNR  text
+*      -->P_I_EKORG  text
+*      -->P_I_WERKS  text
+*      -->P_I_VAILD_TO  text
+*      -->P_I_VAILD_FROM  text
+*      <--P_E_STATUS  text
+*      <--P_E_MESSAGE  text
+*----------------------------------------------------------------------*
+FORM POST_DATA2  TABLES   UT_T_INPUT STRUCTURE ZSVI_GENC
+                 USING    UV_I_LIFNR
+                          UV_I_MATNR
+                          UV_I_EKORG
+                          UV_I_WERKS
+                          UV_I_ESOKZ
+                          UV_I_VAILD_TO
+                          UV_I_VAILD_FROM
+                          UV_I_SCALE
+                 CHANGING CV_E_STATUS
+                          CV_E_MESSAGE.
+
+  DATA: TXT_DATE(10),
+        COUNT        TYPE N VALUE 2,
+        COUNT_SCALE  TYPE N VALUE 1,
+        LV_SRING     TYPE STRING,
+        LV_FIELD     TYPE STRING,
+        LW_INPUT     TYPE ZSVI_GENC,
+        LV_LIFNR     TYPE EINA-LIFNR,
+        LV_MATNR     TYPE EINA-MATNR.
+
+  CALL FUNCTION 'CONVERSION_EXIT_ALPHA_OUTPUT'
+    EXPORTING
+      INPUT  = UV_I_LIFNR
+    IMPORTING
+      OUTPUT = LV_LIFNR.
+
+  CALL FUNCTION 'CONVERSION_EXIT_MATN1_OUTPUT'
+    EXPORTING
+      INPUT  = UV_I_MATNR
+    IMPORTING
+      OUTPUT = LV_MATNR.
+
+
+* input initial
+  PERFORM BDC_DYNPRO      USING 'SAPMM06I' '0100'.
+  PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                              '/00'.
+  PERFORM BDC_FIELD       USING 'EINA-LIFNR'
+                                 LV_LIFNR.
+  PERFORM BDC_FIELD       USING 'EINA-MATNR'
+                                LV_MATNR.
+  PERFORM BDC_FIELD       USING 'EINE-EKORG'
+                                UV_I_EKORG.
+  PERFORM BDC_FIELD       USING 'EINE-WERKS'
+                                UV_I_WERKS.
+  CASE UV_I_ESOKZ.
+    WHEN 'S'.   " Standard
+      PERFORM BDC_FIELD       USING 'RM06I-NORMB'
+                                    'X'.
+    WHEN 'C'.     " Consignment
+      PERFORM BDC_FIELD       USING 'RM06I-KONSI'
+                                    'X'.
+    WHEN 'B'.     " Subcontract
+      PERFORM BDC_FIELD       USING 'RM06I-LOHNB'
+                                    'X'.
+    WHEN 'P'.     " Pipeline
+      PERFORM BDC_FIELD       USING 'RM06I-PIPEL'
+                                    'X'.
+  ENDCASE.
+
+  PERFORM BDC_DYNPRO      USING 'SAPMM06I' '0101'.
+  PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                            '=EINE'.
+*  input general data
+  SORT UT_T_INPUT.
+  LOOP AT UT_T_INPUT INTO LW_INPUT WHERE ZCONSTANT = 'EINA'.
+
+    LV_SRING  = LW_INPUT-ZVALUE2.
+    CONDENSE LV_SRING NO-GAPS.
+
+    CONCATENATE LW_INPUT-ZCONSTANT'-'LW_INPUT-ZVALUE1 INTO LV_FIELD.
+    CONDENSE LV_FIELD NO-GAPS.
+    PERFORM BDC_FIELD  USING LV_FIELD
+                             LV_SRING.
+  ENDLOOP.
+
+  PERFORM BDC_DYNPRO      USING 'SAPMM06I' '0102'.
+  PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                                '=KO'.
+
+*  input purch. org. data 1
+  LOOP AT UT_T_INPUT INTO LW_INPUT WHERE ZCONSTANT = 'EINE'.
+
+    LV_SRING  = LW_INPUT-ZVALUE2.
+    CONDENSE LV_SRING NO-GAPS.
+
+    CONCATENATE LW_INPUT-ZCONSTANT'-'LW_INPUT-ZVALUE1 INTO LV_FIELD.
+    CONDENSE LV_FIELD NO-GAPS.
+    PERFORM BDC_FIELD  USING LV_FIELD
+                             LV_SRING.
+  ENDLOOP.
+
+  PERFORM BDC_DYNPRO      USING 'SAPMV13A' '0201'.
+  CONCATENATE UV_I_VAILD_FROM+6(2)'.'UV_I_VAILD_FROM+4(2)'.'UV_I_VAILD_FROM(4) INTO TXT_DATE.
+  PERFORM BDC_FIELD       USING 'RV13A-DATAB'
+                                TXT_DATE.
+
+  CONCATENATE UV_I_VAILD_TO+6(2)'.'UV_I_VAILD_TO+4(2)'.'UV_I_VAILD_TO(4) INTO TXT_DATE.
+  PERFORM BDC_FIELD       USING 'RV13A-DATBI'
+                                TXT_DATE.
+
+
+  PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                            '/00'.
+
+*  input conditon
+  LOOP AT UT_T_INPUT INTO LW_INPUT WHERE ZCONSTANT = 'KONP'.
+
+    LV_SRING  = LW_INPUT-ZVALUE2.
+    CONDENSE LV_SRING NO-GAPS.
+
+    CONCATENATE LW_INPUT-ZCONSTANT'-'LW_INPUT-ZVALUE1'('COUNT')' INTO LV_FIELD.
+    CONDENSE LV_FIELD NO-GAPS.
+    PERFORM BDC_FIELD  USING LV_FIELD
+                             LV_SRING.
+
+    AT END OF ZGROUP.
+      COUNT = COUNT + 1.
+    ENDAT.
+
+  ENDLOOP.
+
+*  input scale
+  IF UV_I_SCALE = 'Y'.
+
+    PERFORM BDC_DYNPRO      USING 'SAPMV13A' '0201'.
+    PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                                  '=PSTF'.
+    PERFORM BDC_FIELD       USING 'RV130-SELKZ(01)'
+                                  'X'.
+
+    PERFORM BDC_DYNPRO      USING 'SAPMV13A' '0303'.
+    PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                                  '=BACK'.
+
+    LOOP AT UT_T_INPUT INTO LW_INPUT WHERE ZCONSTANT = 'KONM'.
+
+      LV_SRING  = LW_INPUT-ZVALUE2.
+      CONDENSE LV_SRING NO-GAPS.
+
+      CONCATENATE LW_INPUT-ZCONSTANT'-'LW_INPUT-ZVALUE1'('COUNT_SCALE')' INTO LV_FIELD.
+      CONDENSE LV_FIELD NO-GAPS.
+      PERFORM BDC_FIELD  USING LV_FIELD
+                               LV_SRING.
+
+      AT END OF ZGROUP.
+        COUNT_SCALE = COUNT_SCALE + 1.
+      ENDAT.
+
+    ENDLOOP.
+
+  ENDIF.
+
+  PERFORM BDC_FIELD       USING 'BDC_OKCODE'
+                              '=SICH'.
+
+  PERFORM BDC_TRANSACTION USING 'ME11'
+                          CHANGING CV_E_STATUS
+                                   CV_E_MESSAGE.
+
+
+ENDFORM.
